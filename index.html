@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AzuTan</title>
+  <!-- Google Fonts を利用してフォントを読み込み -->
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c&display=swap" rel="stylesheet">
+  <style>
+    
+    body {
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'M PLUS Rounded 1c', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    #container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .item, .title {
+      font-size: 2em;
+      opacity: 0;
+    }
+    .item:not(:last-child) {
+      margin-bottom: 40px;
+    }
+    
+    
+    
+    
+    @keyframes floatUp {
+      0% { transform: translateY(20px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    .float-up { animation: floatUp 1s forwards; }
+    
+    
+    @keyframes slideInRight {
+      0% { transform: translateX(100vw); opacity: 0; }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+    .slide-in-right { animation: slideInRight 0.5s forwards; }
+    
+    
+    @keyframes slideInLeft {
+      0% { transform: translateX(-100vw); opacity: 0; }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+    .slide-in { animation: slideInLeft 0.5s forwards; }
+    
+    
+    @keyframes slideOutRight {
+      0% { transform: translateX(0); opacity: 1; }
+      100% { transform: translateX(100vw); opacity: 0; }
+    }
+    .slide-out { animation: slideOutRight 0.5s forwards !important; }
+    
+    
+    @keyframes slideOutLeft {
+      0% { transform: translateX(0); opacity: 1; }
+      100% { transform: translateX(-100vw); opacity: 0; }
+    }
+    .slide-out-left { animation: slideOutLeft 0.5s forwards !important; }
+    
+    
+    @keyframes startMotion {
+      0% { transform: translateX(-100vw); opacity: 0; }
+      40% { transform: translateX(0); opacity: 1; }
+      70% { transform: translateX(0); opacity: 1; }
+      100% { transform: translateX(100vw); opacity: 0; }
+    }
+    
+    
+    @keyframes fallOver {
+      0% { transform: rotate(0deg); opacity: 1; }
+      100% { transform: rotate(90deg); opacity: 0; }
+    }
+    .fall-over { animation: fallOver 0.5s forwards; }
+    
+    .title {
+      font-size: 1.5em;
+      margin-bottom: 20px;
+    }
+    
+    
+    
+    .back-button, .exit-indicator {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 3em;
+      opacity: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .exit-line {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background-color: black;
+      opacity: 0;
+      animation: slideInLeft 0.5s forwards;
+    }
+    
+    
+    #progress-indicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 1em;
+      text-align: center;
+      border: 2px solid black;
+      border-radius: 50%;
+      padding: 5px;
+      opacity: 0;
+    }
+    
+    
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .fade-out {
+      animation: fadeOut 1s forwards;
+    }
+    
+    
+    .timer-indicator {
+      width: 50px;
+      height: 50px;
+      border: 2px solid black;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 50px;
+      font-size: 1.5em;
+    }
+    
+    
+    .mode-text {
+      font-size: 1.2em;
+    }
+    
+    
+    .result-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+    }
+    
+    .result-title {
+      font-size: 1.5em;
+      margin-top: 80px; 
+      opacity: 0;
+    }
+    
+    .result-correct-count {
+      font-size: 3em;
+      margin-top: 80px;
+      opacity: 0;
+    }
+    .result-missed {
+      font-size: 1em; 
+      position: absolute;
+      bottom: 40px;
+      width: 100%;
+      opacity: 0;
+    }
+    
+    .return-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 3em; 
+      opacity: 0;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- 中央のコンテナ。初期メニューなどがここに表示されます。 -->
+  <div id="container"></div>
+  
+  <script>
+    
+    function adjustFontSizeToFit(element) {
+      element.style.whiteSpace = "nowrap";
+      let currentFontSize = parseFloat(window.getComputedStyle(element).fontSize);
+      while (element.scrollWidth > element.clientWidth && currentFontSize > 5) {
+        currentFontSize -= 1;
+        element.style.fontSize = currentFontSize + "px";
+      }
+    }
+
+    let gameMode = "mode1";
+    let numQuestions = 10;
+    let startActive = false;  // START演出中は true
+
+    let correctCount = 0;
+    
+    
+    document.addEventListener('animationend', function(e) {
+      // fallOverアニメ終了後、要素を完全に非表示
+      if (e.animationName === 'fallOver') {
+        e.target.style.display = 'none';
+      }
+    });
+    
+    
+    let questionData = null;
+    fetch('question.json')
+      .then(response => response.json())
+      .then(data => { questionData = data; })
+      .catch(err => console.error('Error loading question data:', err));
+    
+    
+    let selectedProblems = [];
+    function selectRandomProblems() {
+      const all = questionData.problems.slice();
+      selectedProblems = shuffle(all).slice(0, numQuestions);
+    }
+    
+    
+    let currentProblemIndex = 0;
+    let choiceActive = false;
+    
+    const delayInterval = 0.07;
+    const initialDelay = 0.3;
+    
+    
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+    
+    
+    function initTitleScreen(mode) {
+      const container = document.getElementById('container');
+      container.innerHTML = "";
+      const initialItems = ["通常モード", "発展モード", "設定"];
+      
+      initialItems.forEach((text, index) => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        if (mode === "initial") {
+          div.classList.add('float-up');
+          div.style.animationDelay = `${index * initialDelay}s`;
+        } else {
+          div.classList.add('slide-in-right');
+          div.style.animationDelay = `${index * delayInterval}s`;
+        }
+        div.textContent = text;
+        if (index !== initialItems.length - 1) {
+          div.style.marginBottom = '40px';
+        }
+
+        if (text === "通常モード") {
+          div.id = 'item1';
+          div.addEventListener('click', handleTitleTap);
+        } else if (text === "発展モード") {
+          div.id = 'item2';
+          div.addEventListener('click', handleTitle2Tap);
+        } else if (text === "設定") {
+          div.id = 'item3';
+          div.addEventListener('click', handleTitle3Tap);
+        }
+        container.appendChild(div);
+      });
+
+      correctCount = 0;
+    }
+    
+    
+    function handleTitleTap() {
+      const container = document.getElementById('container');
+      const items = container.querySelectorAll('.item');
+      items.forEach((item, index) => {
+        setTimeout(() => {
+          item.classList.remove('float-up', 'slide-in-right');
+          item.classList.add('slide-out');
+        }, index * delayInterval * 1000);
+      });
+      const totalDelay = (items.length - 1) * delayInterval * 1000 + 500;
+      setTimeout(() => {
+        container.innerHTML = "";
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'title slide-in';
+        titleDiv.textContent = '通常モード';
+        titleDiv.style.animationDelay = '0s';
+        container.appendChild(titleDiv);
+        
+        const newItems = ["10問出題", "30問出題", "100問出題", "特急30問", "特急100問"];
+        newItems.forEach((text, index) => {
+          const div = document.createElement('div');
+          div.className = 'item slide-in';
+          div.textContent = text;
+          div.style.animationDelay = `${index * delayInterval}s`;
+          if (index !== newItems.length - 1) {
+            div.style.marginBottom = '40px';
+          }
+
+          if (text === "10問出題") {
+            gameMode = "mode1";
+            numQuestions = 10;
+            div.addEventListener('click', handleExitAll);
+          } else if (text === "30問出題") {
+            div.addEventListener('click', handleExitAllMode2);
+          } else if (text === "100問出題") {
+            div.addEventListener('click', handleExitAllMode3);
+          } else if (text === "特急30問") {
+            div.addEventListener('click', handleExitAllMode4);
+          } else if (text === "特急100問") {
+            div.addEventListener('click', handleExitAllMode5);
+          }
+          container.appendChild(div);
+        });
+
+        const backButton = document.createElement('div');
+        backButton.className = 'back-button slide-in';
+        backButton.textContent = '↩︎';
+        backButton.style.animationDelay = '0s';
+        document.body.appendChild(backButton);
+        backButton.addEventListener('click', () => { handleBack(backButton); });
+      }, totalDelay);
+    }
+    
+    function handleTitle2Tap() {
+      const container = document.getElementById('container');
+      const items = Array.from(container.querySelectorAll('.item'));
+      const removalOrder = [];
+      items.forEach(item => { if(item.textContent === "発展モード") removalOrder.push(item); });
+      items.forEach(item => { if(item.textContent === "通常モード") removalOrder.push(item); });
+      items.forEach(item => { if(item.textContent === "設定") removalOrder.push(item); });
+      removalOrder.forEach((item, index) => {
+        setTimeout(() => {
+          item.classList.remove('float-up', 'slide-in-right');
+          item.classList.add('slide-out');
+        }, index * delayInterval * 1000);
+      });
+      const totalDelay = (removalOrder.length - 1) * delayInterval * 1000 + 500;
+      setTimeout(() => {
+        container.innerHTML = "";
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'title slide-in';
+        titleDiv.textContent = '発展モード';
+        titleDiv.style.animationDelay = '0s';
+        container.appendChild(titleDiv);
+        
+        const newItems = ["超特急30問", "超特急100問", "トンネル超特急"];
+        newItems.forEach((text, index) => {
+          const div = document.createElement('div');
+          div.className = 'item slide-in';
+          div.textContent = text;
+          div.style.animationDelay = `${index * delayInterval}s`;
+          if (index !== newItems.length - 1) {
+            div.style.marginBottom = '40px';
+          }
+          if(text === "超特急30問") {
+            div.addEventListener('click', handleExitAllMode6);
+          }
+          else if(text === "超特急100問") {
+            div.addEventListener('click', handleExitAllMode7);
+          }
+          else if(text === "トンネル超特急") {
+            div.addEventListener('click', handleExitAllMode8);
+          }
+          container.appendChild(div);
+        });
+        const backButton = document.createElement('div');
+        backButton.className = 'back-button slide-in';
+        backButton.textContent = '↩︎';
+        backButton.style.animationDelay = '0s';
+        document.body.appendChild(backButton);
+        backButton.addEventListener('click', () => { handleBack(backButton); });
+      }, totalDelay);
+    }
+    
+    function handleTitle3Tap() {
+      const container = document.getElementById('container');
+      const items = Array.from(container.querySelectorAll('.item'));
+      const removalOrder = [];
+      items.forEach(item => { if(item.textContent === "設定") removalOrder.push(item); });
+      items.forEach(item => { if(item.textContent === "通常モード") removalOrder.push(item); });
+      items.forEach(item => { if(item.textContent === "発展モード") removalOrder.push(item); });
+      removalOrder.forEach((item, index) => {
+        setTimeout(() => {
+          item.classList.remove('float-up', 'slide-in-right');
+          item.classList.add('slide-out');
+        }, index * delayInterval * 1000);
+      });
+      const totalDelay = (removalOrder.length - 1) * delayInterval * 1000 + 500;
+      setTimeout(() => {
+        container.innerHTML = "";
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'title slide-in';
+        titleDiv.textContent = '設定';
+        titleDiv.style.animationDelay = '0s';
+        container.appendChild(titleDiv);
+        
+        const newItems = ["サウンド（未実装）", "問題一覧（未実装）", "マイ辞書（未実装）", "問題編集（未実装）"];
+        newItems.forEach((text, index) => {
+          const div = document.createElement('div');
+          div.className = 'item slide-in';
+          div.textContent = text;
+          div.style.animationDelay = `${index * delayInterval}s`;
+          if (index !== newItems.length - 1) {
+            div.style.marginBottom = '40px';
+          }
+          container.appendChild(div);
+        });
+        const backButton = document.createElement('div');
+        backButton.className = 'back-button slide-in';
+        backButton.textContent = '↩︎';
+        backButton.style.animationDelay = '0s';
+        document.body.appendChild(backButton);
+        backButton.addEventListener('click', () => { handleBack(backButton); });
+      }, totalDelay);
+    }
+    
+    
+    function handleBack(backButton) {
+      const container = document.getElementById('container');
+      const elements = [];
+      elements.push(backButton);
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      elements.forEach((el, idx) => {
+        setTimeout(() => {
+          el.classList.remove('slide-in', 'slide-in-right', 'slide-out');
+          el.classList.add('slide-out-left');
+        }, idx * delayInterval * 1000);
+      });
+      const totalDelayBack = (elements.length - 1) * delayInterval * 1000 + 500;
+      setTimeout(() => {
+        if (document.body.contains(backButton)) {
+          document.body.removeChild(backButton);
+        }
+        initTitleScreen("back");
+      }, totalDelayBack);
+    }
+    
+    
+    function addExitIndicatorClick() {
+      const exitIndicator = document.querySelector('.exit-indicator');
+      if (exitIndicator) {
+        exitIndicator.style.cursor = choiceActive ? 'pointer' : 'default';
+        exitIndicator.addEventListener('click', function(e) {
+          if (startActive) { 
+            e.stopPropagation();
+            return;
+          }
+          if (choiceActive) {
+            resultTransition();
+          } else {
+            e.stopPropagation();
+          }
+        });
+      }
+    }
+    
+    
+    function handleExitAll() {
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        // × ボタン
+        const exitIndicator = document.createElement('div');
+        exitIndicator.className = 'exit-indicator slide-in';
+        exitIndicator.textContent = '×';
+        exitIndicator.style.opacity = '1';
+        document.body.appendChild(exitIndicator);
+        addExitIndicatorClick();
+
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+        modeText.textContent = '10問出題モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    function handleExitAllMode2() {
+      gameMode = "mode2";
+      numQuestions = 30;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const exitIndicator = document.createElement('div');
+        exitIndicator.className = 'exit-indicator slide-in';
+        exitIndicator.textContent = '×';
+        exitIndicator.style.opacity = '1';
+        document.body.appendChild(exitIndicator);
+        addExitIndicatorClick();
+        
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+        modeText.textContent = '30問出題モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    function handleExitAllMode3() {
+      gameMode = "mode3";
+      numQuestions = 100;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const exitIndicator = document.createElement('div');
+        exitIndicator.className = 'exit-indicator slide-in';
+        exitIndicator.textContent = '×';
+        exitIndicator.style.opacity = '1';
+        document.body.appendChild(exitIndicator);
+        addExitIndicatorClick();
+        
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+        modeText.textContent = '100問出題モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    // === ここから文字修正済み ===
+    // 「特急30問モード」
+    function handleExitAllMode4() {
+      gameMode = "mode4";
+      numQuestions = 30;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+
+        modeText.textContent = '特急30問モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    // 「特急100問モード」
+    function handleExitAllMode5() {
+      gameMode = "mode5";
+      numQuestions = 100;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+
+        modeText.textContent = '特急100問モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    // 「超特急30問モード」
+    function handleExitAllMode6() {
+      gameMode = "mode6";
+      numQuestions = 30;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+
+        modeText.textContent = '超特急30問モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    // 「超特急100問モード」
+    function handleExitAllMode7() {
+      gameMode = "mode7";
+      numQuestions = 100;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+
+        modeText.textContent = '超特急100問モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    function handleExitAllMode8() {
+      gameMode = "mode8";
+      numQuestions = 100;
+      const container = document.getElementById('container');
+      const elements = [];
+      container.querySelectorAll('*').forEach(el => elements.push(el));
+      const backButton = document.querySelector('.back-button');
+      if (backButton) { elements.push(backButton); }
+      elements.forEach(el => {
+        el.style.animationDelay = '0s';
+        el.classList.remove('slide-in', 'slide-in-right', 'float-up');
+        el.classList.add('slide-out');
+      });
+      setTimeout(() => {
+        container.innerHTML = "";
+        if (backButton && backButton.parentElement) {
+          backButton.parentElement.removeChild(backButton);
+        }
+        const linePositions = ["10%", "28%", "46%", "64%"];
+        linePositions.forEach(pos => {
+          const line = document.createElement('div');
+          line.className = 'exit-line slide-in';
+          line.style.bottom = pos;
+          document.body.appendChild(line);
+        });
+        
+        const modeText = document.createElement('div');
+        modeText.className = 'mode-text slide-in';
+        modeText.textContent = 'トンネル超特急モード';
+        modeText.style.position = 'absolute';
+        modeText.style.bottom = '20px';
+        modeText.style.width = '100%';
+        modeText.style.textAlign = 'center';
+        document.body.appendChild(modeText);
+        
+        startActive = true;
+        const startText = document.createElement('div');
+        startText.textContent = 'START';
+        startText.style.position = 'absolute';
+        startText.style.top = '103px';
+        startText.style.width = '100%';
+        startText.style.textAlign = 'center';
+        startText.style.fontSize = '3em';
+        startText.style.animation = "startMotion 2s forwards";
+        document.body.appendChild(startText);
+        
+        startText.addEventListener('animationend', function() {
+          startText.remove();
+          startActive = false;
+          showFirstProblem();
+        });
+      }, 500);
+    }
+    
+    
+    function displayProblem(index) {
+      choiceActive = true;
+      const problem = selectedProblems[index];
+
+      const problemText = document.createElement('div');
+      problemText.id = 'problem-text';
+      problemText.textContent = problem.question;
+      problemText.style.position = 'absolute';
+      problemText.style.top = '103px';
+      problemText.style.width = '100%';
+      problemText.style.textAlign = 'center';
+      problemText.style.fontSize = '3em';
+      problemText.className = 'slide-in';
+      document.body.appendChild(problemText);
+      adjustFontSizeToFit(problemText);
+
+      const progressIndicator = document.createElement('div');
+      progressIndicator.id = 'progress-indicator';
+      progressIndicator.textContent = `${index + 1} / ${selectedProblems.length}`;
+      progressIndicator.style.position = 'absolute';
+      progressIndicator.style.top = '20px';
+      progressIndicator.style.right = '20px';
+      progressIndicator.style.border = '2px solid black';
+      progressIndicator.style.borderRadius = '50%';
+      progressIndicator.style.padding = '5px';
+      progressIndicator.style.textAlign = 'center';
+      progressIndicator.style.fontSize = '1em';
+      progressIndicator.className = 'slide-in';
+      document.body.appendChild(progressIndicator);
+      
+      // タイマー生成（mode4～mode8）
+      let timerInterval, timerTimeout;
+      if (
+        gameMode === "mode4" || gameMode === "mode5" ||
+        gameMode === "mode6" || gameMode === "mode7" ||
+        gameMode === "mode8"
+      ) {
+        let initialTime, timerDuration;
+        if (gameMode === "mode4" || gameMode === "mode5") {
+          initialTime = 5;
+          timerDuration = 5000;
+        } else {
+          initialTime = 3;
+          timerDuration = 3000;
+        }
+        const timerIndicator = document.createElement('div');
+        timerIndicator.className = 'timer-indicator slide-in';
+        timerIndicator.style.position = 'absolute';
+        timerIndicator.style.top = '20px';
+        timerIndicator.style.left = '20px';
+        timerIndicator.textContent = initialTime.toString();
+        document.body.appendChild(timerIndicator);
+        
+        let timeLeft = initialTime;
+        timerInterval = setInterval(() => {
+          timeLeft--;
+          if(timeLeft > 0) {
+            timerIndicator.textContent = timeLeft.toString();
+          }
+          // mode8: 残り1秒で選択肢表示
+          if (gameMode === "mode8" && timeLeft === 1) {
+            const choices = document.querySelectorAll('.choice');
+            choices.forEach(choice => {
+              choice.style.visibility = "visible";
+            });
+          }
+        }, 1000);
+        
+        timerTimeout = setTimeout(() => {
+          if(choiceActive) {
+            choiceActive = false;
+            timerIndicator.classList.add('fall-over');
+            setTimeout(() => timerIndicator.remove(), 500);
+            const allChoices = document.querySelectorAll('.choice');
+            allChoices.forEach(elem => {
+              if(elem.textContent !== problem.correct) {
+                elem.classList.add('fall-over');
+              }
+            });
+            if(!document.getElementById('wrong-indicator')) {
+              const wrongIndicator = document.createElement('div');
+              wrongIndicator.id = 'wrong-indicator';
+              wrongIndicator.textContent = '時間切れ';
+              wrongIndicator.style.position = 'absolute';
+              wrongIndicator.style.top = '180px';
+              wrongIndicator.style.width = '100%';
+              wrongIndicator.style.textAlign = 'center';
+              wrongIndicator.style.color = 'red';
+              wrongIndicator.style.fontSize = '1em';
+              document.body.appendChild(wrongIndicator);
+            }
+            if(!document.getElementById('next-button')) {
+              const nextButton = document.createElement('div');
+              nextButton.id = 'next-button';
+              nextButton.textContent = '▶︎';
+              nextButton.style.position = 'absolute';
+              nextButton.style.bottom = '10px';
+              nextButton.style.right = '20px';
+              nextButton.style.fontSize = '2em';
+              nextButton.addEventListener('click', function() {
+
+                resultTransition();
+              });
+              document.body.appendChild(nextButton);
+            }
+          }
+          clearInterval(timerInterval);
+        }, timerDuration);
+        
+        var clearMode4Timer = function() {
+          clearTimeout(timerTimeout);
+          clearInterval(timerInterval);
+          const existingTimer = document.querySelector('.timer-indicator');
+          if(existingTimer) {
+            existingTimer.classList.add('fall-over');
+            setTimeout(() => existingTimer.remove(), 500);
+          }
+        };
+      }
+
+      const choicesPositions = ["51%", "33%", "15%"];
+      const choicesArray = [problem.correct, ...problem.incorrect];
+      const shuffledChoices = shuffle(choicesArray.slice());
+      shuffledChoices.forEach(function(choiceText, idx) {
+        const choiceElem = document.createElement('div');
+        choiceElem.textContent = choiceText;
+        choiceElem.style.position = 'absolute';
+        choiceElem.style.width = '100%';
+        choiceElem.style.textAlign = 'center';
+        choiceElem.style.fontSize = '2em';
+        choiceElem.style.bottom = choicesPositions[idx];
+        choiceElem.className = 'choice slide-in';
+        if(gameMode === "mode8") {
+          choiceElem.style.visibility = "hidden"; // mode8は残り1秒まで非表示
+        }
+        document.body.appendChild(choiceElem);
+        adjustFontSizeToFit(choiceElem);
+        
+        choiceElem.addEventListener('click', function() {
+          if (!choiceActive) return;
+          choiceActive = false;
+          
+          if (
+            gameMode === "mode4" || gameMode === "mode5" ||
+            gameMode === "mode6" || gameMode === "mode7" ||
+            gameMode === "mode8"
+          ) {
+            clearTimeout(timerTimeout);
+            clearInterval(timerInterval);
+          }
+          
+          if (choiceText !== problem.correct) {
+
+            if (
+              gameMode === "mode4" || gameMode === "mode5" ||
+              gameMode === "mode6" || gameMode === "mode7" ||
+              gameMode === "mode8"
+            ) {
+              var existingTimer = document.querySelector('.timer-indicator');
+              if(existingTimer) {
+                existingTimer.classList.add('fall-over');
+                setTimeout(() => existingTimer.remove(), 500);
+              }
+            }
+            const allChoices = document.querySelectorAll('.choice');
+            allChoices.forEach(elem => {
+              if (elem.textContent !== problem.correct) {
+                elem.classList.add('fall-over');
+              }
+            });
+            if (!document.getElementById('wrong-indicator')) {
+              const wrongIndicator = document.createElement('div');
+              wrongIndicator.id = 'wrong-indicator';
+              wrongIndicator.textContent = '不正解';
+              wrongIndicator.style.position = 'absolute';
+              wrongIndicator.style.top = '180px';
+              wrongIndicator.style.width = '100%';
+              wrongIndicator.style.textAlign = 'center';
+              wrongIndicator.style.color = 'red';
+              wrongIndicator.style.fontSize = '1em';
+              document.body.appendChild(wrongIndicator);
+            }
+            if (!document.getElementById('next-button')) {
+              const nextButton = document.createElement('div');
+              nextButton.id = 'next-button';
+              nextButton.textContent = '▶︎';
+              nextButton.style.position = 'absolute';
+              nextButton.style.bottom = '10px';
+              nextButton.style.right = '20px';
+              nextButton.style.fontSize = '2em';
+              
+              if (gameMode === "mode1" || gameMode === "mode2" || gameMode === "mode3") {
+                nextButton.addEventListener('click', nextProblem);
+              } else {
+                nextButton.addEventListener('click', function() {
+                  resultTransition();
+                });
+              }
+              document.body.appendChild(nextButton);
+            }
+          } else {
+
+            correctCount++;
+            if (
+              gameMode === "mode4" || gameMode === "mode5" ||
+              gameMode === "mode6" || gameMode === "mode7" ||
+              gameMode === "mode8"
+            ) {
+              const existingTimer = document.querySelector('.timer-indicator');
+              if(existingTimer) {
+                existingTimer.classList.add('slide-out');
+                setTimeout(() => existingTimer.remove(), 500);
+              }
+              nextProblem();
+            } else {
+              const allChoices = document.querySelectorAll('.choice');
+              allChoices.forEach(elem => {
+                if (elem.textContent !== problem.correct) {
+                  elem.classList.add('fall-over');
+                }
+              });
+              if (!document.getElementById('right-indicator')) {
+                const rightIndicator = document.createElement('div');
+                rightIndicator.id = 'right-indicator';
+                rightIndicator.textContent = '正解';
+                rightIndicator.style.position = 'absolute';
+                rightIndicator.style.top = '180px';
+                rightIndicator.style.width = '100%';
+                rightIndicator.style.textAlign = 'center';
+                rightIndicator.style.color = 'green';
+                rightIndicator.style.fontSize = '1em';
+                document.body.appendChild(rightIndicator);
+              }
+              setTimeout(nextProblem, 2000);
+            }
+          }
+        });
+      });
+    }
+    
+    
+    function showFirstProblem() {
+      selectRandomProblems();
+      currentProblemIndex = 0;
+      displayProblem(currentProblemIndex);
+    }
+    
+    
+    function nextProblem() {
+      choiceActive = false;
+      const problemElem = document.querySelector('#problem-text');
+      const choiceElems = document.querySelectorAll('.choice');
+      const nextButton = document.getElementById('next-button');
+      const wrongIndicator = document.getElementById('wrong-indicator');
+      const rightIndicator = document.getElementById('right-indicator');
+      const progressIndicator = document.getElementById('progress-indicator');
+      
+      if (problemElem) { problemElem.classList.add('slide-out'); }
+      choiceElems.forEach(elem => elem.classList.add('slide-out'));
+      if (nextButton) { nextButton.classList.add('slide-out'); }
+      if (wrongIndicator) { wrongIndicator.classList.add('slide-out'); }
+      if (rightIndicator) { rightIndicator.classList.add('slide-out'); }
+      if (progressIndicator) { progressIndicator.classList.add('slide-out'); }
+      
+      setTimeout(() => {
+        if (problemElem) problemElem.remove();
+        choiceElems.forEach(elem => elem.remove());
+        if (nextButton) nextButton.remove();
+        if (wrongIndicator) wrongIndicator.remove();
+        if (rightIndicator) rightIndicator.remove();
+        if (progressIndicator) progressIndicator.remove();
+        
+        if (currentProblemIndex === selectedProblems.length - 1) {
+          resultTransition();
+        } else {
+          currentProblemIndex++;
+          displayProblem(currentProblemIndex);
+        }
+      }, 500);
+    }
+    
+    
+    function getGameModeName() {
+      switch(gameMode) {
+        case "mode1": return "10問出題モード";
+        case "mode2": return "30問出題モード";
+        case "mode3": return "100問出題モード";
+        case "mode4": return "特急30問モード";
+        case "mode5": return "特急100問モード";
+        case "mode6": return "超特急30問モード";
+        case "mode7": return "超特急100問モード";
+        case "mode8": return "トンネル超特急モード";
+        default:      return "不明モード";
+      }
+    }
+    
+    function showResultScreen() {
+      const resultContainer = document.createElement('div');
+      resultContainer.className = 'result-container';
+      document.body.appendChild(resultContainer);
+
+      const resultTitle = document.createElement('div');
+      resultTitle.className = 'result-title float-up';
+      resultTitle.style.animationDelay = '0s';
+      resultTitle.textContent = getGameModeName();
+      resultContainer.appendChild(resultTitle);
+
+      const resultCorrect = document.createElement('div');
+      resultCorrect.className = 'result-correct-count float-up';
+      resultCorrect.style.animationDelay = '0.5s';
+      resultCorrect.textContent = `${correctCount} / ${numQuestions}`;
+      resultContainer.appendChild(resultCorrect);
+      
+      // 間違えた問題一覧（仮）
+      const resultMissed = document.createElement('div');
+      resultMissed.className = 'result-missed float-up';
+      resultMissed.style.animationDelay = '1.0s';
+      resultMissed.textContent = "（間違えた問題一覧：仮配置）";
+      resultContainer.appendChild(resultMissed);
+      
+      // タイトルに戻るボタン（↩︎）
+      const returnButton = document.createElement('div');
+      returnButton.className = 'return-button float-up';
+      returnButton.style.animationDelay = '1.0s';
+      returnButton.textContent = '↩︎';
+      resultContainer.appendChild(returnButton);
+      
+      // クリック時、一斉にフェードアウトして1秒後にタイトルへ
+      returnButton.addEventListener('click', () => {
+        [resultTitle, resultCorrect, resultMissed, returnButton].forEach(el => {
+          el.style.animationDelay = '0s';
+          el.classList.add('fade-out');
+        });
+        setTimeout(() => {
+          if (resultContainer) {
+            document.body.removeChild(resultContainer);
+          }
+          initTitleScreen("initial");
+        }, 1000);
+      });
+    }
+    
+    function resultTransition() {
+      const problemElem = document.querySelector('#problem-text');
+      const choiceElems = document.querySelectorAll('.choice');
+      const nextButton = document.getElementById('next-button');
+      const wrongIndicator = document.getElementById('wrong-indicator');
+      const rightIndicator = document.getElementById('right-indicator');
+      const progressIndicator = document.getElementById('progress-indicator');
+      const exitLines = document.querySelectorAll('.exit-line');
+      const modeTexts = document.querySelectorAll('.mode-text');
+      const exitIndicator = document.querySelector('.exit-indicator');
+      
+      if (problemElem) { problemElem.classList.add('slide-out'); }
+      choiceElems.forEach(elem => elem.classList.add('slide-out'));
+      if (nextButton) { nextButton.classList.add('slide-out'); }
+      if (wrongIndicator) { wrongIndicator.classList.add('slide-out'); }
+      if (rightIndicator) { rightIndicator.classList.add('slide-out'); }
+      if (progressIndicator) { progressIndicator.classList.add('slide-out'); }
+      exitLines.forEach(line => line.classList.add('slide-out'));
+      modeTexts.forEach(el => el.classList.add('slide-out'));
+      if (exitIndicator) { exitIndicator.classList.add('slide-out'); }
+      
+      setTimeout(() => {
+        if (problemElem) problemElem.remove();
+        choiceElems.forEach(elem => elem.remove());
+        if (nextButton) nextButton.remove();
+        if (wrongIndicator) wrongIndicator.remove();
+        if (rightIndicator) rightIndicator.remove();
+        if (progressIndicator) progressIndicator.remove();
+        exitLines.forEach(line => line.remove());
+        modeTexts.forEach(el => el.remove());
+        if (exitIndicator) exitIndicator.remove();
+
+        showResultScreen();
+      }, 500);
+    }
+
+    window.onload = () => {
+      initTitleScreen("initial");
+    };
+  </script>
+</body>
+</html>
